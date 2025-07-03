@@ -3178,4 +3178,10 @@ LDAP_ATTRIBUTE_FOR_GROUPS = PersistentConfig(
     "LDAP_ATTRIBUTE_FOR_GROUPS",
     "ldap.server.attribute_for_groups",
     os.environ.get("LDAP_ATTRIBUTE_FOR_GROUPS", "memberOf"),
+)   
+
+ENABLE_UPSTREAM_MODEL_UPDATE_ON_KNOWLEDGE_DELETION = PersistentConfig(
+    "ENABLE_UPSTREAM_MODEL_UPDATE_ON_KNOWLEDGE_DELETION",
+    "knowledge.enable_upstream_model_update_on_deletion",
+    os.environ.get("ENABLE_UPSTREAM_MODEL_UPDATE_ON_KNOWLEDGE_DELETION", "False").lower() == "true",
 )

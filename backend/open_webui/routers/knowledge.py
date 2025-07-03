@@ -26,6 +26,7 @@ from open_webui.utils.access_control import has_access, has_permission
 
 from open_webui.env import SRC_LOG_LEVELS
 from open_webui.models.models import Models, ModelForm
+from open_webui.config import ENABLE_UPSTREAM_MODEL_UPDATE_ON_KNOWLEDGE_DELETION
 
 
 log = logging.getLogger(__name__)
@@ -600,39 +601,33 @@ async def delete_knowledge_by_id(id: str, user=Depends(get_verified_user)):
 
     log.info(f"Deleting knowledge base: {id} (name: {knowledge.name})")
 
-    # Get all models
-    models = Models.get_all_models()
-    log.info(f"Found {len(models)} models to check for knowledge base {id}")
+    if ENABLE_UPSTREAM_MODEL_UPDATE_ON_KNOWLEDGE_DELETION.value:
+        # Get all models
+        models = Models.get_all_models()
 
-    # Update models that reference this knowledge base
-    for model in models:
-        if model.meta and hasattr(model.meta, "knowledge"):
-            knowledge_list = model.meta.knowledge or []
-            # Filter out the deleted knowledge base
-            updated_knowledge = [k for k in knowledge_list if k.get("id") != id]
+        # Update models that reference this knowledge base
+        for model in models:
+            if model.meta and hasattr(model.meta, "knowledge"):
+                knowledge_list = model.meta.knowledge or []
+                # Filter out the deleted knowledge base
+                updated_knowledge = [k for k in knowledge_list if k.get("id") != id]
 
-            # If the knowledge list changed, update the model
-            if len(updated_knowledge) != len(knowledge_list):
-                log.info(f"Updating model {model.id} to remove knowledge base {id}")
-                model.meta.knowledge = updated_knowledge
-                # Create a ModelForm for the update
-                model_form = ModelForm(
-                    id=model.id,
-                    name=model.name,
-                    base_model_id=model.base_model_id,
-                    meta=model.meta,
-                    params=model.params,
-                    access_control=model.access_control,
-                    is_active=model.is_active,
-                )
-                Models.update_model_by_id(model.id, model_form)
-
-    # Clean up vector DB
-    try:
-        VECTOR_DB_CLIENT.delete_collection(collection_name=id)
-    except Exception as e:
-        log.debug(e)
-        pass
+                # If the knowledge list changed, update the model
+                if len(updated_knowledge) != len(knowledge_list):
+                    log.debug(f"Updating model {model.id} to remove knowledge base {id}")
+                    # Ensure meta is a dict for serialization
+                    meta_dict = model.meta.dict() if hasattr(model.meta, "dict") else dict(model.meta)
+                    meta_dict["knowledge"] = updated_knowledge
+                    model_form = ModelForm(
+                        id=model.id,
+                        name=model.name,
+                        base_model_id=model.base_model_id,
+                        meta=meta_dict,
+                        params=model.params,
+                        access_control=model.access_control,
+                        is_active=model.is_active,
+                    )
+                    Models.update_model_by_id(model.id, model_form)
     result = Knowledges.delete_knowledge_by_id(id=id)
     return result
 
